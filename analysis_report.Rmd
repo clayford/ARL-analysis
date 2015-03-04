@@ -1,0 +1,114 @@
+---
+title: "ARL data exploration and analysis"
+author: "Clay Ford & Michele Claibourn"
+date: "Feb 20, 2015; Revised Feb 21, 2015"
+output: pdf_document
+---
+
+```{r warning=FALSE}
+library(ggplot2)
+library(scales)
+load("~/Box Sync/mpc/DataServices/Consulting/dtolson/ARLdata.rda")
+```
+
+We reduced the sample to only state and private universities in the US and are using only the data for 2013 (data appear more complete for 2013, e.g., Harvard is not present in the 204 data). 
+
+* The outcome of interest is the total expenditures (totexp), the sum of expenditures on materials, binding, salaries and wages, and other operating expenditures. 
+* The potential drivers include: total full-time student enrollment (totstu), total graduate student enrollment (gradstu), number of full-time instructional faculty (fac), number of Ph.D.s awarded (phdaw), number of fields in which Ph.D.s are awarded (phdfld), and volumes held (vols). 
+* Institution type (public or private), region, and whether the reported data includes data from a law or medical library are retained as potential control variables.
+
+```{r}
+# use only type == P and type == S for 2013
+dat <- subset(dat, type %in% c("P","S") & year==2013)
+# scale total expenditures in 1000s of dollars
+dat$totexp0 <- dat$totexp/1000
+summary(dat$totexp0)
+dat[dat$inam=="VIRGINIA", "totexp0"]
+dat[dat$totexp0>60000, c("inam", "totexp0")]
+```
+
+The mean total expenditures among ARL libraries is $29M. UVa Library's total expenditures in 2013 are reported as $32,696,918 (and are represented in the graph below by an orange dot). University library's with reported expenditures greater than $60M include Harvard ($117M), Yale ($85M), Michigan ($67M), and Columbia ($65M).
+
+```{r, echo=FALSE}
+x <- dat[dat$inam=="VIRGINIA","totexp0"]
+hist(dat$totexp0, breaks=15, xlab="Total Expenditures (in thousands of dollars)",
+     main=("Histogram of Total Expenditures"), col="gray90")
+points(x, 0, col="orange",pch=19)
+```
+
+To begin, we generated the scatterplots of total expenditures by each of the potential drivers. UVa is represented by an orange dot. Note that UVa's expenditures consistently sit above the fitted line.
+
+```{r, echo=FALSE, fig.width=5, fig.height=4}
+ggplot(dat, aes_string(y="totexp0", x="fac")) + geom_point() + 
+  geom_smooth(se=F) + geom_smooth(se=F, method="lm", color="grey") + 
+  labs(y="Total Expenditures (in 1000s)",x="Number of Faculty") +
+  ggtitle("Expenditures by Faculty Size, 2013") + 
+  # make point for UVa
+  geom_point(data = subset(dat, instno=="8900"), mapping = aes_string(y="totexp0", x="fac"), 
+             color="orange", size=3)
+## Penn State (6600) is outlier on x
+
+ggplot(dat, aes_string(y="totexp0", x="totstu")) + geom_point() + 
+  geom_smooth(se=F) + geom_smooth(se=F, method="lm", color="grey") + 
+  labs(y="Total Expenditures (in 1000s)",x="Number of Students") +
+  ggtitle("Expenditures by Number of Students, 2013") + 
+  # make point for UVa
+  geom_point(data = subset(dat, instno=="8900"), mapping = aes_string(y="totexp0", x="totstu"), 
+             color="orange", size=3)
+## Penn State (6600) is outlier on x
+
+ggplot(dat, aes_string(y="totexp0", x="gradstu")) + geom_point() + 
+  geom_smooth(se=F) + geom_smooth(se=F, method="lm", color="grey") + 
+  labs(y="Total Expenditures (in 1000s)",x="Number of Grad Students") +
+  ggtitle("Expenditures by Graduate Students, 2013") + 
+  # make point for UVa
+  geom_point(data = subset(dat, instno=="8900"), mapping = aes_string(y="totexp0", x="gradstu"), 
+             color="orange", size=3)
+## Southern California (7500) is outlier on x
+
+ggplot(dat, aes_string(y="totexp0", x="phdfld")) + geom_point() + 
+  geom_smooth(se=F) + geom_smooth(se=F, method="lm", color="grey") + 
+  labs(y="Total Expenditures (in 1000s)",x="Number of PhD Fields") +
+  ggtitle("Expenditures by Number of PhD Fields, 2013") + 
+  # make point for UVa
+  geom_point(data = subset(dat, instno=="8900"), mapping = aes_string(y="totexp0", x="phdfld"), 
+             color="orange", size=3)
+## Florida State (2700) is outlier on x
+
+ggplot(dat, aes_string(y="totexp0", x="vols")) + geom_point() + 
+  geom_smooth(se=F) + geom_smooth(se=F, method="lm", color="grey") + 
+  labs(y="Total Expenditures (in 1000s)",x="Number of Volumes") +
+  ggtitle("Expenditures by Number of Volumes, 2013") + 
+  # make point for UVa
+  geom_point(data = subset(dat, instno=="8900"), mapping = aes_string(y="totexp0", x="vols"), 
+             color="orange", size=3)
+## Harvard (3100) is outler in x
+```
+
+A linear model of total expenditures as a function of number of full-time students, graduate students, full-time faculty, PhD fields, and volumes generates a fitted value for Virginia of $28.5M compared to Virginia's reported 2013 expenditures of $32.7M.
+
+```{r}
+mod1 <- lm(totexp0 ~ totstu + gradstu + fac + phdfld + vols, data=dat, subset= inam!="VIRGINIA")
+summary(mod1)
+
+predict(mod1, newdata = dat[dat$inam=="VIRGINIA",])
+dat[dat$inam=="VIRGINIA","totexp0"]
+```
+
+UVa's residual (actual- predicted value) is relatively small, but positive. It is shown on the histogram and scatterplot below as an orange dot.
+
+```{r echo=FALSE, warning=FALSE}
+par(mfrow=c(1,2))
+mod.res <- resid(mod1)
+x1 <- mod.res[92]
+hist(mod.res, breaks=15, xlab="Actual-Predicted Value", main="Histogram of Residuals", col="gray90")
+points(x1, 0, col="orange", pch=19)
+
+plot(mod.res, ylab="Actual-Predicted Value", main="Plot of Residuals")
+abline(h=0)
+points(x1, col="orange", pch=19)
+```
+
+We tried several versions of the model (excluding some variables, including additional controls for private/public and inclusion of a medical or law school library, including all years); in all cases, the model under-predicts UVa library expenditures (generally by about 4M to 9M).
+
+One dimension this doesn't account for is the reputaiton or perceived quality of the university. Of the 98 institutions included in this analysis, not all would be considered "peer institutions" for UVa. Perhaps there is a way of incorporating an attribute that accounts for reputation of the university (e.g., rankings or some key input underscoring these?). 
