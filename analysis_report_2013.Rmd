@@ -1,0 +1,305 @@
+---
+title: "ARL - Special Collections, Law, and Heath Sciences"
+author: "Clay Ford & Michele Claibourn"
+date: "May 2015"
+output: pdf_document
+---
+
+```{r warning=FALSE}
+library(ggplot2)
+library(scales)
+# load("~/Box Sync/mpc/DataServices/Consulting/dtolson/ARLdata.rda")
+load("ARL2013data.Rda")
+
+```
+
+
+The data are for special collections, law, and heath sciences libraries for 2013, identified by the origin variable. We reduced the sample to only state and private universities in the US. 
+
+* The outcome of interest is the total expenditures (totexp), the sum of expenditures on materials, binding, salaries and wages, and other operating expenditures. 
+* The potential drivers include: total full-time student enrollment (totstu), total graduate student enrollment (gradstu), number of full-time instructional faculty (fac), number of Ph.D.s awarded (phdaw), number of fields in which Ph.D.s are awarded (phdfld), and volumes held (vols). 
+* Institution type (public or private) and region are retained as potential control variables.
+
+
+```{r }
+# use only type == P and type == S for 2013
+dat <- subset(dat, type %in% c("P","S"))
+rownames(dat) <- NULL
+
+# scale total expenditures in 1000s of dollars
+dat$totexp0 <- dat$totexp/1000
+
+# summary of totalexp0 by origin (ie, special collections, law, and heath sciences)
+sapply(split(dat, dat$origin),function(x)summary(x$totexp0))
+
+# number in each category
+as.data.frame(xtabs(~ origin, data=dat))
+
+# UVa data by origin
+subset(dat, subset = inam=="VIRGINIA", 
+       select = c("inam","fac", "totstu", "gradstu", "phdfld", "vols", "totexp0"))
+
+# Top 5 totexp0 per origin
+top5 <- function(x){
+  tmp <- x[head(order(x$totexp0, decreasing = TRUE),n=5),c("inam","totexp0")]
+  rownames(tmp) <- NULL
+  tmp
+  }
+lapply(split(dat, dat$origin),top5)
+
+
+
+```
+
+The mean total expenditures among health sciences, law and special collections is $4.1M, $3.1M and $1.3M, respectively. UVa Library's total expenditures in those categories for 2013 are reported as $4,117,991, $3,451,008, and $1,644,632 (and are represented in the graph below by an orange dot). Also notice the missing data for the special collections record. UVa is not unique in this regard as we'll see below.
+
+
+```{r, echo=FALSE, fig.width=7, fig.height=4}
+ggplot(data=dat, aes(x=totexp0)) + geom_histogram(binwidth=700) + facet_wrap(~ origin) +
+  labs(x="Total Expenditures (in thousands of dollars)", title="Histogram of Total Expenditures") +
+  geom_point(data = subset(dat,inam=="VIRGINIA"), aes(x=totexp0, y=0), color="orange", size=4)
+
+
+```
+
+
+Unfortunately, most special collections records are missing data for variables of interest, including UVa. With the exception of Number of Volumes (vols), only 3 schools have data for all three variables. A fourth school, Alabama, has all zeros. Therefore the graphs below for special collections are of limited value.
+
+
+```{r}
+# create data frame of special collections records
+scData <- subset(dat, subset = origin=="special.collections", 
+                 select = c("inam","fac", "totstu", "gradstu", "phdfld", "vols"))
+
+# number of schools with special collections records
+nrow(scData)
+
+# number of cells missing data for variables of interest
+sapply(scData, function(x)sum(is.na(x)))[-1]
+
+# schools with data for variables of interest
+scData[complete.cases(scData),]
+
+
+```
+
+To begin, we generated the scatterplots of total expenditures by each of the potential drivers. UVa is represented by an orange dot. Note that UVa's expenditures consistently sit above the fitted line.
+
+The outliers in Law are Indiana and Texas, each with huge numbers of faculty, students, graduate students and PhD fields. The outlier in Health Sciences is Wisconsin.
+
+```{r, echo=FALSE, warning=FALSE, fig.width=7, fig.height=4}
+ggplot(dat, aes_string(y="totexp0", x="fac")) + geom_point() + 
+  geom_smooth(se=F, method="lm", color="grey") + 
+  labs(y="Total Expenditures (in 1000s)",x="Number of Faculty") +
+  ggtitle("Expenditures by Faculty Size, 2013") + 
+  # make point for UVa
+  geom_point(data = subset(dat, instno=="8900"), mapping = aes_string(y="totexp0", x="fac"), 
+             color="orange", size=3) +
+  facet_wrap(~ origin)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+ggplot(dat, aes_string(y="totexp0", x="totstu")) + geom_point() + 
+  geom_smooth(se=F, method="lm", color="grey") + 
+  labs(y="Total Expenditures (in 1000s)",x="Number of Students") +
+  ggtitle("Expenditures by Number of Students, 2013") + 
+  # make point for UVa
+  geom_point(data = subset(dat, instno=="8900"), mapping = aes_string(y="totexp0", x="totstu"), 
+             color="orange", size=3) +
+  facet_wrap(~ origin) +
+  scale_x_continuous(labels=comma)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, fig.width=7, fig.height=4}
+ggplot(dat, aes_string(y="totexp0", x="gradstu")) + geom_point() + 
+  geom_smooth(se=F, method="lm", color="grey") + 
+  labs(y="Total Expenditures (in 1000s)",x="Number of Grad Students") +
+  ggtitle("Expenditures by Graduate Students, 2013") + 
+  # make point for UVa
+  geom_point(data = subset(dat, instno=="8900"), mapping = aes_string(y="totexp0", x="gradstu"), 
+             color="orange", size=3)  +
+  facet_wrap(~ origin)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, fig.width=7, fig.height=4}
+ggplot(dat, aes_string(y="totexp0", x="phdfld")) + geom_point() + 
+  geom_smooth(se=F, method="lm", color="grey") + 
+  labs(y="Total Expenditures (in 1000s)",x="Number of PhD Fields") +
+  ggtitle("Expenditures by Number of PhD Fields, 2013") + 
+  # make point for UVa
+  geom_point(data = subset(dat, instno=="8900"), mapping = aes_string(y="totexp0", x="phdfld"), 
+             color="orange", size=3) +
+  facet_wrap(~ origin)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, fig.width=7, fig.height=4}
+ggplot(dat, aes_string(y="totexp0", x="vols")) + geom_point() + 
+  geom_smooth(se=F, method="lm", color="grey") + geom_smooth(se=F) +
+  labs(y="Total Expenditures (in 1000s)",x="Number of Volumes") +
+  ggtitle("Expenditures by Number of Volumes, 2013") + 
+  # make point for UVa
+  geom_point(data = subset(dat, instno=="8900"), mapping = aes_string(y="totexp0", x="vols"), 
+             color="orange", size=3) +
+  facet_wrap(~ origin, scales = "free_x") +
+  scale_x_continuous(labels=comma)
+```
+
+In the following plots we notice that Total Students and Grad Students are highly correlated. Thus we only use total students (`totstu`) in the modeling that follows. 
+
+```{r, echo=FALSE, warning=FALSE, fig.width=7, fig.height=4}
+ggplot(dat, aes(x=totstu, y=gradstu)) + geom_point() + 
+  geom_smooth(method="lm", se=F, color="grey") + geom_smooth(se = F) +
+  facet_wrap(~ origin) +
+  ggtitle("Grad Students vs. Total Students")
+
+```
+
+In the next plots we see that Faculty and Total Students are highly correlated for Law Libraries. We'll remember this when modeling the Law data.
+
+
+```{r, echo=FALSE, warning=FALSE, fig.width=7, fig.height=4}
+ggplot(dat, aes(x=totstu, y=fac)) + geom_point() + 
+  geom_smooth(method="lm", se=F, color="grey") + geom_smooth(se = F) +
+  facet_wrap(~ origin) +
+  ggtitle("Faculty vs. Total Students")
+
+```
+
+
+# Health Sciences
+
+In this section we look at Health Sciences libraries.
+
+A linear model of total expenditures as a function of number of full-time students, full-time faculty, and PhD fields generates a fitted value for Virginia of $3.3M compared to Virginia's reported 2013 health sciences expenditures of $4.1M. Note that 39 observations were removed due to missing values and that only 17 schools were used in building the model. Further the model is statistically insignificant (*F = 0.15; p-value > 0.9*)
+
+One school, Wisconson, heavily influences the model due to its large number of full-time students (37,953). A model fit without Wisconsin produces a better-fitting model but remains statistically insignificant and decreases the predicted value for UVa  to $3.1M. 
+
+
+```{r}
+mod1 <- lm(totexp0 ~ totstu + fac + phdfld, data=dat, 
+           subset= inam!="VIRGINIA" & origin=="health.sciences")
+summary(mod1)
+
+# predicted UVa totexp0
+puva <- predict(mod1, newdata = subset(dat, inam=="VIRGINIA" & dat$origin=="health.sciences"))
+dollar(puva*1000)
+
+# actual UVa totexp0
+auva <- subset(dat, inam=="VIRGINIA" & dat$origin=="health.sciences", 
+               select= c("totexp0"))
+dollar(auva$totexp0*1000)
+
+# calculate influence measures
+inflm <- influence.measures(mod1)
+# see which observations exceed various thresholds
+summary(inflm)
+# obs 56 is very influential
+vs <- c("inam","totexp0","totstu","gradstu","fac","phdfld")
+dat[56,vs]
+
+# fit model without Wisconsin
+mod2 <- update(mod1, subset= !(inam %in% c("VIRGINIA","WISCONSIN")) 
+               & origin=="health.sciences")
+summary(mod2)
+
+puva <- predict(mod2, newdata = subset(dat, inam=="VIRGINIA" & dat$origin=="health.sciences"))
+dollar(puva * 1000)
+
+```
+
+UVa's residual (actual - predicted value) is relatively large and positive for the original model (`mod1`). It is shown on the histogram and scatterplot below as an orange dot.
+
+```{r echo=FALSE, warning=FALSE}
+
+par(mfrow=c(1,2))
+mod.res <- resid(mod1)
+hist(mod.res, breaks=15, xlab="Actual-Predicted Value", 
+     main="Histogram of Residuals", col="gray90")
+points(auva$totexp0 - puva, 0, col="orange", pch=19)
+
+plot(mod1, which=1, main="Plot of Residuals", caption="", add.smooth=F)
+abline(h=0)
+points(x = puva, y = auva$totexp0 - puva, col="orange", pch=19)
+```
+
+# Law
+
+In this section we turn our attention to Law libraries.
+
+Once again we fit a linear model of total expenditures as a function of number of full-time students, full-time faculty, and PhD fields. This generates a fitted value for Virginia of $2.4M compared to Virginia's reported 2013 law expenditures of $3.4M. Note that 44 observations were removed due to missing values and that only 23 schools were used in building the model. 
+
+Indiana and Texas especially influence the model due to extreme values in predictor fields. For example, each report about 40 times the total number of students than other schools. When a model is fit without these schools, the predicted value for UVa increases to about $4.0M. We see that the model is statistically significant (*F = 9.7; p-value < 0.001*) and that faculty has a significantly negative relationship with `totexp0`. In other words the model predicts higher expenses for each additional faculty member. This seems counterintuitive and is probably due to some extreme values. For example, Yale has one of the highest expenses at $6.4M but reports only 1 faculty member. Likewise Southern California reports expenses of $2.8M with 0 faculty members.
+
+We fit an additional model without Yale and Southern California and see that faculty is no longer a significant predictor of expense, but then neither is any other variable despite the fact the model remains statistically significant (*F = 18.2, p-value < 0.001*). This is likely due to the correlation between faculty and total students. In the final model we drop faculty and retain Yale and Southern California. This produces a significant model with `totstu` as a significant predictor of expenses. The predicted value for UVa remains $4.0M.
+
+
+```{r}
+mod1 <- lm(totexp0 ~ totstu + fac + phdfld, data=dat, 
+           subset= inam!="VIRGINIA" & origin=="law")
+summary(mod1)
+
+# predicted UVa totexp0
+puva <- predict(mod1, newdata = subset(dat, inam=="VIRGINIA" & dat$origin=="law"))
+dollar(puva*1000)
+
+# actual UVa totexp0
+auva <- subset(dat, inam=="VIRGINIA" & dat$origin=="law", select= c("totexp0"))
+dollar(auva$totexp0*1000)
+
+# calculate influence measures
+inflm <- influence.measures(mod1)
+# see which observations exceed various thresholds
+summary(inflm)
+# Two observations are very influential: Texas and Indiana
+dat[c(87, 116),vs]
+
+# fit model without Indiana and Texas
+mod2 <- update(mod1, subset= !(inam %in% c("VIRGINIA", "INDIANA", "TEXAS")) & origin=="law")
+summary(mod2)
+
+puva <- predict(mod2, newdata = subset(dat, inam=="VIRGINIA" & origin=="law"))
+dollar(puva*1000)
+
+# fit model without Yale and Southern California
+mod3 <- update(mod2, subset= 
+                 !(inam %in% c("VIRGINIA", "INDIANA", "TEXAS", "SOUTHERN CALIFORNIA", "YALE")) 
+               & origin=="law")
+summary(mod3)
+
+mod4 <- update(mod3, . ~ . -fac, 
+               subset= !(inam %in% c("VIRGINIA", "INDIANA", "TEXAS")) 
+                              & origin=="law")
+summary(mod4)
+
+puva <- predict(mod4, newdata = subset(dat, inam=="VIRGINIA" & origin=="law"))
+dollar(puva*1000)
+
+```
+
+UVa's residual (actual - predicted value) is negative for the final model (`mod4`). It is shown on the histogram and scatterplot below as an orange dot. The outlier (125) is Yale.
+
+```{r echo=FALSE, warning=FALSE}
+
+par(mfrow=c(1,2))
+mod.res <- resid(mod4)
+hist(mod.res, breaks=15, xlab="Actual-Predicted Value", main="Histogram of Residuals", col="gray90")
+points(auva$totexp0 - puva, 0, col="orange", pch=19)
+
+plot(mod4, which=1, main="Plot of Residuals", caption="", add.smooth=F)
+abline(h=0)
+points(x = puva, y = auva$totexp0 - puva, col="orange", pch=19)
+```
+
+
+# Special Collections
+
+Due to the large number of missing values, no analysis is carried out on special collections data.
+
+
+# Discussion
+
+Clearly the data is incomplete. For example, out of 68 observations for Law, 44 are dropped during modeling due to missing data (over 60%). It's even worse for Health Sciences in which 39 out of 57 are dropped due to missingness (over 65%). (One of the missing in each subset is Harvard.) And Special Collections could not even be analyzed. Therefore it's difficult to justify drawing any conclusions from this analysis beyond descriptive statistics. 
